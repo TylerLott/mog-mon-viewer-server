@@ -1,0 +1,10 @@
+FROM node:16.3.0
+ENV NODE_ENV=production
+WORKDIR /viewer-server
+COPY package*.json ./
+RUN npm i -g yarn
+RUN yarn install --production
+COPY . .
+CMD ["node", "index.js"]
+
+

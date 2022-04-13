@@ -1,6 +1,6 @@
 import express from "express"
 
-const PORT = 4500
+const PORT = 80
 
 const app = express()
 
