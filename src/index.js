@@ -4,7 +4,6 @@ import cors from "cors"
 import { Server } from "socket.io"
 import { createClient } from "redis"
 
-const USER_TIMEOUT = 60000
 let PORT = 80
 let PATH = "/api/viewer"
 let REDIS_PATH = "redis://44.204.86.55:6379"
@@ -66,35 +65,39 @@ if (process.env.NODE_ENV !== "production") {
     // emite teams to teams
     io.emit("teams", JSON.parse(teams))
     // for each team
-    const t = JSON.parse(teams)
-    Object.keys(t).forEach((team) => {
-      // subscribe to team
-      redisSub.subscribe(`${team}`, (count, chan) => {
-        console.log(count, team)
-        // when team changes, get from key and emit to all
-        let cnt = redisPub.get(team)
-        // if no count, set to 0 and emit 0
-        if (!cnt) {
-          cnt = 0
-          redisPub.set(team, cnt)
-        }
-        io.emit("count-update", { team: chan, val: cnt })
+    const t = JSON.parse(teams) // teams is an arr
+    if (Array.isArray(t)) {
+      t.forEach((team) => {
+        // subscribe to team
+        redisSub.subscribe(`${team.name}`, (count, chan) => {
+          console.log(count, team)
+          // when team changes, get from key and emit to all
+          let cnt = redisPub.get(team.name)
+          // if no count, set to 0 and emit 0
+          if (!cnt) {
+            cnt = 0
+            redisPub.set(team.name, cnt)
+          }
+          io.emit("count-update", { team: chan, val: cnt })
+        })
       })
-    })
+    }
   })
   await redisSub.subscribe("players", (players, chan) => {
-    io.emit("players", JSON.parse(players)) // should be players as they are in mongo
+    io.emit("players", JSON.parse(players)) // players is an arr
   })
 
   await redisSub.subscribe("settings", (settings, chan) => {
+    console.log("got settings", settings) // settings is an object
     let sets = JSON.parse(settings)
+    console.log("sets", sets)
     io.emit("settings", sets)
     redisPub.set("user-timeout", sets.userTimeout)
     redisPub.set("thresh", sets.userTimeout)
   })
   await redisSub.subscribe("team-timeouts", (teams, chan) => {
     let t = JSON.parse(teams) // {team: teamname, count: count}
-    if (t.count === 0) {
+    if (t.val === 0) {
       redisPub.set(t.team, 0)
     }
   })
@@ -108,7 +111,9 @@ if (process.env.NODE_ENV !== "production") {
       // do auth stuff first
       // check if user is timed-out
       let time = redisPub.get(attack.userId)
-      if (time && parseInt(time) + USER_TIMEOUT < Date.now()) {
+      let userTimeout = redisPub.get("settings")
+      userTimeout = JSON.parse(userTimeout).userTimeout
+      if (time && parseInt(time) + userTimeout < Date.now()) {
         // stop attack
         socket.emit("timeout", time)
       } else {
