@@ -16,10 +16,10 @@ if (process.env.NODE_ENV !== "production") {
 
 // SETUP
 const app = express()
+app.use(cors)
 const server = http.createServer(app)
 let io
 if (process.env.NODE_ENV !== "production") {
-  app.use(cors)
   io = new Server(server, {
     cors: {
       oriign: "*",
@@ -64,24 +64,26 @@ if (process.env.NODE_ENV !== "production") {
   ////////////////////////////////////////////////////////////
   await redisSub.subscribe("teams", (teams, chan) => {
     // emite teams to teams
-    io.emit("teams", JSON.parse(teams))
-    // for each team
-    const t = JSON.parse(teams) // teams is an arr
-    if (Array.isArray(t)) {
-      t.forEach((team) => {
-        // subscribe to team
-        redisSub.subscribe(`${team.name}`, (count, chan) => {
-          console.log(count, team)
-          // when team changes, get from key and emit to all
-          let cnt = redisPub.get(team.name)
-          // if no count, set to 0 and emit 0
-          if (!cnt) {
-            cnt = 0
-            redisPub.set(team.name, cnt)
-          }
-          io.emit("count-update", { team: chan, val: cnt })
+    if (teams) {
+      io.emit("teams", teams)
+      // for each team
+      const t = JSON.parse(teams) // teams is an arr
+      if (Array.isArray(t)) {
+        t.forEach((team) => {
+          // subscribe to team
+          redisSub.subscribe(`${team.name}`, (count, chan) => {
+            console.log(count, team)
+            // when team changes, get from key and emit to all
+            let cnt = redisPub.get(team.name)
+            // if no count, set to 0 and emit 0
+            if (!cnt) {
+              cnt = 0
+              redisPub.set(team.name, cnt)
+            }
+            io.emit("count-update", { team: chan, val: cnt })
+          })
         })
-      })
+      }
     }
   })
   await redisSub.subscribe("players", (players, chan) => {
@@ -102,61 +104,91 @@ if (process.env.NODE_ENV !== "production") {
       redisPub.set(t.team, 0)
     }
   })
-  await redisPub.publish("teams", JSON.stringify({ teamTest: "test" }))
+  await redisPub.publish(
+    "teams",
+    JSON.stringify([{ name: "test", players: [] }])
+  )
+  await redisPub.set(
+    "teams",
+    JSON.stringify([
+      { name: "test", players: [] },
+      { name: "test2", players: [] },
+    ])
+  )
+  await redisPub.set(
+    "players",
+    JSON.stringify([
+      { name: "test", players: [] },
+      { name: "test2", players: [] },
+    ])
+  )
+  await redisPub.set(
+    "settings",
+    JSON.stringify([
+      { name: "test", players: [] },
+      { name: "test2", players: [] },
+    ])
+  )
+
   ////////////////////////////////////////////////////////////
   // SOCKET SETUP
   ////////////////////////////////////////////////////////////
-  io.on("connection", (socket) => {
-    // auth with amzn headers
-    try {
-      let j = socket.handshake.headers["x-amzn-oidc-data"]
-      j = jwt_decode(j)
-    } catch (e) {
-      socket.disconnect()
+  io.on("connection", async (socket) => {
+    if (process.env.NODE_ENV === "production") {
+      // auth with amzn headers
+      try {
+        let j = socket.handshake.headers["x-amzn-oidc-data"]
+        j = jwt_decode(j)
+      } catch (e) {
+        socket.disconnect()
+      }
+      const userId = j.client
+    } else {
+      const userId = "test"
     }
-    const userId = j.client
 
     // auth
-    let t = redisPub.get("teams")
+    let t = await redisPub.get("teams")
+    console.log(JSON.parse(t))
     if (t) {
-      socket.emit("add-teams", JSON.parse(teams))
+      socket.emit("add-teams", JSON.parse(t))
     }
-    let p = redisPub.get("players")
+    let p = await redisPub.get("players")
     if (p) {
       socket.emit("add-players", JSON.parse(p))
     }
-    let s = redisPub.get("settings")
+    let s = await redisPub.get("settings")
     if (s) {
       socket.emit("settings", JSON.parse(s))
     }
 
-    socket.on("attack", (attack) => {
+    socket.on("attack", async (attack) => {
       // get attack from socket
       // do auth stuff first
       // check if user is timed-out
-      let time = redisPub.get(userId)
-      let userTimeout = redisPub.get("settings")
+      let time = await redisPub.get(userId)
+      let userTimeout = await redisPub.get("settings")
       userTimeout = JSON.parse(userTimeout).userTimeout
       if (time && parseInt(time) + userTimeout > Date.now()) {
         // stop attack
         socket.emit("timeout", time)
       } else {
-        redisPub.set(attack.user, Date.now())
+        await redisPub.set(attack.user, Date.now())
         // check if the team exists and is able to be attacked
-        let cnt = redisPub.get(attack.team)
-        let thresh = redisPub.get("thresh")
+        let cnt = await redisPub.get(attack.team)
+        let thresh = await redisPub.get("thresh")
         if (cnt && !isNaN(cnt) && cnt < thresh) {
-          redisPub.incr(attack.team)
+          await redisPub.incr(attack.team)
           redisPub.publish(attack.team, 1)
         } else if (!cnt) {
-          redisPub.set(attack.team, 1)
+          await redisPub.set(attack.team, 1)
           redisPub.publish(attack.team, 1)
         } else {
           let t = Date.now()
-          redisPub.set(attack.team, `time,${t}`)
+          await redisPub.set(attack.team, `time,${t}`)
           redisPub.publish(
             "team-timeouts",
-            JSON.stringify({ team: attack.team, count: thresh })
+            JSON.stringify({ team: attack.team, val: thresh })
           )
           socket.emit("count-update", { team: attack.team, val: t })
         }
