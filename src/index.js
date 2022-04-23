@@ -3,6 +3,7 @@ import http from "http"
 import cors from "cors"
 import { Server } from "socket.io"
 import { createClient } from "redis"
+import jwt_decode from "jwt-decode"
 
 let PORT = 80
 let PATH = "/api/viewer"
@@ -106,36 +107,59 @@ if (process.env.NODE_ENV !== "production") {
   // SOCKET SETUP
   ////////////////////////////////////////////////////////////
   io.on("connection", (socket) => {
+    // auth with amzn headers
+    try {
+      let j = socket.handshake.headers["x-amzn-oidc-data"]
+      j = jwt_decode(j)
+    } catch (e) {
+      socket.disconnect()
+    }
+    const userId = j.client
+
+    // auth
+    let t = redisPub.get("teams")
+    if (t) {
+      socket.emit("add-teams", JSON.parse(teams))
+    }
+    let p = redisPub.get("players")
+    if (p) {
+      socket.emit("add-players", JSON.parse(p))
+    }
+    let s = redisPub.get("settings")
+    if (s) {
+      socket.emit("settings", JSON.parse(s))
+    }
+
     socket.on("attack", (attack) => {
       // get attack from socket
       // do auth stuff first
       // check if user is timed-out
-      let time = redisPub.get(attack.userId)
+      let time = redisPub.get(userId)
       let userTimeout = redisPub.get("settings")
       userTimeout = JSON.parse(userTimeout).userTimeout
-      if (time && parseInt(time) + userTimeout < Date.now()) {
+      if (time && parseInt(time) + userTimeout > Date.now()) {
         // stop attack
         socket.emit("timeout", time)
       } else {
         redisPub.set(attack.user, Date.now())
-      }
-      // check if the team exists and is able to be attacked
-      let cnt = redisPub.get(attack.team)
-      let thresh = redisPub.get("thresh")
-      if (cnt && !isNaN(cnt) && cnt < thresh) {
-        redisPub.incr(attack.team)
-        redisPub.publish(attack.team, 1)
-      } else if (!cnt) {
-        redisPub.set(attack.team, 1)
-        redisPub.publish(attack.team, 1)
-      } else {
-        let t = Date.now()
-        redisPub.set(attack.team, `time,${t}`)
-        redisPub.publish(
-          "team-timeouts",
-          JSON.stringify({ team: attack.team, count: thresh })
-        )
-        socket.emit("count-update", { team: attack.team, val: t })
+        // check if the team exists and is able to be attacked
+        let cnt = redisPub.get(attack.team)
+        let thresh = redisPub.get("thresh")
+        if (cnt && !isNaN(cnt) && cnt < thresh) {
+          redisPub.incr(attack.team)
+          redisPub.publish(attack.team, 1)
+        } else if (!cnt) {
+          redisPub.set(attack.team, 1)
+          redisPub.publish(attack.team, 1)
+        } else {
+          let t = Date.now()
+          redisPub.set(attack.team, `time,${t}`)
+          redisPub.publish(
+            "team-timeouts",
+            JSON.stringify({ team: attack.team, count: thresh })
+          )
+          socket.emit("count-update", { team: attack.team, val: t })
+        }
       }
     })
   })
