@@ -16,10 +16,10 @@ if (process.env.NODE_ENV !== "production") {
 
 // SETUP
 const app = express()
-app.use(cors)
 const server = http.createServer(app)
 let io
 if (process.env.NODE_ENV !== "production") {
+  app.use(cors)
   io = new Server(server, {
     cors: {
       oriign: "*",
