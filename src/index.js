@@ -180,8 +180,8 @@ if (process.env.NODE_ENV !== "production") {
       }
     })
   })
-  // LISTEN
-  server.listen(PORT, () => {
-    console.log(`listening on port ${PORT}`)
-  })
 })()
+// LISTEN
+server.listen(PORT, () => {
+  console.log(`listening on port ${PORT}`)
+})
