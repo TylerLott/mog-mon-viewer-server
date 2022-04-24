@@ -106,6 +106,7 @@ if (process.env.NODE_ENV !== "production") {
   // SOCKET SETUP
   ////////////////////////////////////////////////////////////
   io.on("connection", async (socket) => {
+    console.log("connection", socket.handshake.headers)
     let userId
     if (process.env.NODE_ENV === "production") {
       // auth with amzn headers
