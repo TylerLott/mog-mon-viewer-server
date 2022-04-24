@@ -68,6 +68,7 @@ if (process.env.NODE_ENV !== "production") {
       io.emit("add-teams", JSON.parse(teams))
       // for each team
       const t = JSON.parse(teams) // teams is an arr
+      console.log("teams", t)
       if (Array.isArray(t)) {
         t.forEach(async (team) => {
           // subscribe to team
@@ -123,6 +124,7 @@ if (process.env.NODE_ENV !== "production") {
     let t = await redisPub.get("teams")
     t = JSON.parse(t)
     if (t) {
+      console.log("emitting teams", t)
       socket.emit("add-teams", t)
     }
     t.forEach(async (team) => {
@@ -131,10 +133,12 @@ if (process.env.NODE_ENV !== "production") {
     })
     let p = await redisPub.get("players")
     if (p) {
+      console.log("emitting players", players)
       socket.emit("add-players", JSON.parse(p))
     }
     let s = await redisPub.get("settings")
     if (s) {
+      console.log("emitting settings")
       socket.emit("settings", JSON.parse(s))
     }
 
