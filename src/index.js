@@ -134,12 +134,10 @@ app.io = io
     })
     let p = await redisPub.get("players")
     if (p) {
-      console.log("emitting players", players)
       socket.emit("add-players", JSON.parse(p))
     }
     let s = await redisPub.get("settings")
     if (s) {
-      console.log("emitting settings")
       socket.emit("settings", JSON.parse(s))
     }
 
