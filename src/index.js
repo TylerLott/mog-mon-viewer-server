@@ -17,6 +17,7 @@ if (process.env.NODE_ENV !== "production") {
 // SETUP
 const app = express()
 const server = http.createServer(app)
+
 let io
 if (process.env.NODE_ENV !== "production") {
   app.use(cors)
@@ -106,6 +107,7 @@ app.io = io
   ////////////////////////////////////////////////////////////
   // SOCKET SETUP
   ////////////////////////////////////////////////////////////
+  console.log("setting up io connection")
   io.on("connection", async (socket) => {
     console.log("connection", socket.handshake.headers)
     let userId
@@ -181,6 +183,7 @@ app.io = io
       }
     })
   })
+  console.log("io", io)
   // LISTEN
   server.listen(PORT, () => {
     console.log(`listening on port ${PORT}`)
