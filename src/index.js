@@ -30,6 +30,7 @@ if (process.env.NODE_ENV !== "production") {
 } else {
   io = new Server(server, { path: PATH })
 }
+app.io = io
 ;(async () => {
   ////////////////////////////////////////////////////////////
   // connect
@@ -180,8 +181,8 @@ if (process.env.NODE_ENV !== "production") {
       }
     })
   })
+  // LISTEN
+  server.listen(PORT, () => {
+    console.log(`listening on port ${PORT}`)
+  })
 })()
-// LISTEN
-server.listen(PORT, () => {
-  console.log(`listening on port ${PORT}`)
-})
