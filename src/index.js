@@ -111,16 +111,13 @@ app.io = io
   io.on("connection", async (socket) => {
     console.log("connection", socket.handshake.headers)
     let userId
-    if (process.env.NODE_ENV === "production") {
-      // auth with amzn headers
-      try {
-        let j = socket.handshake.headers["x-amzn-oidc-data"]
-        j = jwt_decode(j)
-      } catch (e) {
-        socket.disconnect()
-      }
+    // auth with amzn headers
+    try {
+      let j = socket.handshake.headers["x-amzn-oidc-data"]
+      j = jwt_decode(j)
       userId = j.client
-    } else {
+    } catch (e) {
+      socket.disconnect()
       userId = "testuser"
     }
 
