@@ -7,11 +7,11 @@ import jwt_decode from "jwt-decode"
 
 let PORT = 80
 let PATH = "/api/viewer"
-let REDIS_PATH = "redis://34.228.17.8:6379"
+let REDIS_PATH = "redis://54.227.184.239:6379"
 if (process.env.NODE_ENV !== "production") {
   PORT = 7000
   PATH = ""
-  REDIS_PATH = "redis://34.228.17.8:6379"
+  REDIS_PATH = "redis://54.227.184.239:6379"
 }
 
 // SETUP
